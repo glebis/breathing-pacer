@@ -1,0 +1,837 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>5-6 Breathing Pacer</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Geist:wght@800&family=Geist+Mono:wght@400;500&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    background: #1a0a00;
+    height: 100vh;
+    width: 100vw;
+    overflow: hidden;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Geist Mono', 'Courier New', monospace;
+    cursor: none;
+    user-select: none;
+  }
+
+  .container {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+
+  /* Visual canvas for shapes */
+  canvas#vizCanvas {
+    position: absolute;
+    inset: 0;
+    z-index: 1;
+  }
+
+  /* Fill layer (used in fill modes) */
+  .fill {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 0%;
+    z-index: 2;
+    transition: height var(--duration) cubic-bezier(0.35, 0, 0.25, 1);
+    will-change: height;
+  }
+
+  .fill-line {
+    position: absolute;
+    top: -2px;
+    left: 0;
+    width: 100%;
+    height: 4px;
+    z-index: 3;
+  }
+
+  .label {
+    position: absolute;
+    color: rgba(255, 214, 10, 0.5);
+    font-family: 'Geist', Arial, sans-serif;
+    font-size: 1.6rem;
+    font-weight: 800;
+    letter-spacing: 0.3em;
+    text-transform: uppercase;
+    z-index: 10;
+    transition: opacity 0.8s ease;
+  }
+
+  .counter {
+    position: absolute;
+    bottom: 2.5rem;
+    right: 3rem;
+    color: rgba(232, 93, 4, 0.3);
+    font-size: 0.9rem;
+    font-weight: 400;
+    letter-spacing: 0.15em;
+    z-index: 10;
+  }
+
+  .beat-num {
+    position: absolute;
+    bottom: 2.5rem;
+    left: 3rem;
+    color: rgba(255, 214, 10, 0.25);
+    font-size: 1rem;
+    font-weight: 500;
+    z-index: 10;
+    transition: color 0.15s ease;
+  }
+
+  .beat-num.flash { color: rgba(255, 214, 10, 0.6); }
+
+  .mode-indicator {
+    position: absolute;
+    top: 2.5rem;
+    left: 3rem;
+    color: rgba(255, 255, 255, 0.15);
+    font-size: 0.75rem;
+    letter-spacing: 0.15em;
+    z-index: 10;
+  }
+
+  .pulse-dot {
+    position: absolute;
+    top: 2.5rem;
+    right: 3rem;
+    width: 10px;
+    height: 10px;
+    background: rgba(232, 93, 4, 0.5);
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.1s ease;
+    box-shadow: 2px 2px 0px 0px rgba(0,0,0,0.3);
+  }
+
+  .pulse-dot.on { opacity: 1; }
+
+  .start-screen {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    background: #1a0a00;
+    cursor: pointer;
+    transition: opacity 0.8s ease;
+  }
+
+  .start-screen h1 {
+    color: #e85d04;
+    font-family: 'Geist', Arial, sans-serif;
+    font-size: 4rem;
+    font-weight: 800;
+    letter-spacing: 0.2em;
+    margin-bottom: 0.5rem;
+    text-shadow: 4px 4px 0px rgba(0,0,0,0.5);
+  }
+
+  .start-screen p {
+    color: rgba(255, 214, 10, 0.5);
+    font-size: 1rem;
+    font-weight: 400;
+    letter-spacing: 0.2em;
+  }
+
+  .start-screen .sub {
+    margin-top: 2.5rem;
+    font-size: 0.8rem;
+    color: rgba(232, 93, 4, 0.3);
+    letter-spacing: 0.15em;
+  }
+
+  .start-screen .info {
+    margin-top: 0.8rem;
+    font-size: 0.7rem;
+    color: rgba(255, 255, 255, 0.12);
+    letter-spacing: 0.1em;
+  }
+
+  .hidden { opacity: 0; pointer-events: none; }
+</style>
+</head>
+<body>
+
+<div class="container">
+  <div class="start-screen" id="startScreen">
+    <h1>5 — 6</h1>
+    <p>inhale 5 · exhale 6</p>
+    <p class="sub">tap to begin</p>
+    <p class="info">← → arrows to change visual mode</p>
+  </div>
+
+  <canvas id="vizCanvas"></canvas>
+  <div class="fill" id="fill"><div class="fill-line" id="fillLine"></div></div>
+  <div class="label" id="label"></div>
+  <div class="counter" id="counter"></div>
+  <div class="beat-num" id="beatNum"></div>
+  <div class="mode-indicator" id="modeIndicator"></div>
+  <div class="pulse-dot" id="pulseDot"></div>
+</div>
+
+<script>
+  // ---- Config ----
+  const INHALE_BEATS = 5;
+  const EXHALE_BEATS = 6;
+  const BPM = 60;
+  const BEAT_MS = (60 / BPM) * 1000;
+  const INHALE_MS = INHALE_BEATS * BEAT_MS;
+  const EXHALE_MS = EXHALE_BEATS * BEAT_MS;
+
+  const C_ORANGE = '#e85d04';
+  const C_YELLOW = '#ffd60a';
+  const C_BG = '#1a0a00';
+
+  // ---- DOM ----
+  const fill = document.getElementById('fill');
+  const fillLine = document.getElementById('fillLine');
+  const label = document.getElementById('label');
+  const counter = document.getElementById('counter');
+  const beatNum = document.getElementById('beatNum');
+  const pulseDot = document.getElementById('pulseDot');
+  const modeIndicator = document.getElementById('modeIndicator');
+  const startScreen = document.getElementById('startScreen');
+  const canvas = document.getElementById('vizCanvas');
+  const ctx = canvas.getContext('2d');
+
+  // ---- State ----
+  let running = false;
+  let breathCount = 0;
+  let currentBeat = 0;
+  let beatInterval = null;
+  let phase = 'idle'; // 'inhale' | 'exhale' | 'idle'
+  let phaseStart = 0;
+  let progress = 0; // 0-1 within current phase
+
+  // ---- Visual Modes ----
+  const MODES = [
+    { name: 'solid fill', type: 'fill', style: 'solid' },
+    { name: 'gradient fill', type: 'fill', style: 'gradient' },
+    { name: 'expanding circle', type: 'canvas', draw: drawCircle },
+    { name: 'breathing square', type: 'canvas', draw: drawSquare },
+    { name: 'diamond', type: 'canvas', draw: drawDiamond },
+    { name: 'concentric rings', type: 'canvas', draw: drawRings },
+    { name: 'cool diagonal', type: 'canvas', draw: drawDiagonal },
+    { name: 'ocean sweep', type: 'canvas', draw: drawOceanSweep },
+    { name: 'frost field', type: 'canvas', draw: drawFrostField },
+    { name: 'cool solid fill', type: 'fill', style: 'cool-solid' },
+  ];
+  let modeIndex = 0;
+
+  function isCoolMode() {
+    const name = MODES[modeIndex].name;
+    return name.includes('cool') || name.includes('ocean') || name.includes('frost') || name.includes('diagonal');
+  }
+
+  function setMode(i) {
+    modeIndex = ((i % MODES.length) + MODES.length) % MODES.length;
+    const mode = MODES[modeIndex];
+    modeIndicator.textContent = mode.name;
+
+    const cool = isCoolMode();
+    document.body.style.background = cool ? '#050a1a' : '#1a0a00';
+    label.style.color = cool ? 'rgba(120, 200, 255, 0.5)' : 'rgba(255, 214, 10, 0.5)';
+    beatNum.style.color = cool ? 'rgba(100, 180, 240, 0.25)' : 'rgba(255, 214, 10, 0.25)';
+
+    if (mode.type === 'fill') {
+      fill.style.display = 'block';
+      canvas.style.display = 'none';
+      applyFillStyle(mode.style);
+    } else {
+      fill.style.display = 'none';
+      canvas.style.display = 'block';
+    }
+  }
+
+  function applyFillStyle(style) {
+    if (style === 'solid') {
+      fill.style.background = `rgba(232, 93, 4, 0.35)`;
+      fillLine.style.background = C_YELLOW;
+      fillLine.style.filter = 'blur(6px)';
+    } else if (style === 'cool-solid') {
+      fill.style.background = `rgba(58, 134, 255, 0.25)`;
+      fillLine.style.background = `rgba(120, 200, 255, 0.6)`;
+      fillLine.style.filter = 'blur(8px)';
+    } else {
+      fill.style.background = `linear-gradient(180deg, rgba(232,93,4,0.1) 0%, rgba(232,93,4,0.3) 40%, rgba(255,214,10,0.25) 70%, rgba(255,214,10,0.45) 100%)`;
+      fillLine.style.background = `rgba(255, 214, 10, 0.5)`;
+      fillLine.style.filter = 'blur(10px)';
+    }
+  }
+
+  // ---- Canvas Drawings ----
+  function resizeCanvas() {
+    canvas.width = window.innerWidth * devicePixelRatio;
+    canvas.height = window.innerHeight * devicePixelRatio;
+    canvas.style.width = window.innerWidth + 'px';
+    canvas.style.height = window.innerHeight + 'px';
+    ctx.scale(devicePixelRatio, devicePixelRatio);
+  }
+
+  function drawCircle(p) {
+    const w = window.innerWidth, h = window.innerHeight;
+    const maxR = Math.min(w, h) * 0.38;
+    const minR = maxR * 0.15;
+    const r = minR + (maxR - minR) * p;
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.beginPath();
+    ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+    ctx.fillStyle = phase === 'inhale'
+      ? `rgba(232, 93, 4, ${0.15 + p * 0.2})`
+      : `rgba(255, 214, 10, ${0.1 + (1 - p) * 0.15})`;
+    ctx.fill();
+
+    // Border
+    ctx.beginPath();
+    ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+    ctx.strokeStyle = `rgba(255, 214, 10, ${0.2 + p * 0.3})`;
+    ctx.lineWidth = 2;
+    ctx.stroke();
+  }
+
+  function drawSquare(p) {
+    const w = window.innerWidth, h = window.innerHeight;
+    const maxS = Math.min(w, h) * 0.55;
+    const minS = maxS * 0.2;
+    const s = minS + (maxS - minS) * p;
+
+    ctx.clearRect(0, 0, w, h);
+
+    const x = (w - s) / 2, y = (h - s) / 2;
+    ctx.fillStyle = phase === 'inhale'
+      ? `rgba(232, 93, 4, ${0.12 + p * 0.18})`
+      : `rgba(255, 214, 10, ${0.08 + (1 - p) * 0.12})`;
+    ctx.fillRect(x, y, s, s);
+
+    ctx.strokeStyle = `rgba(232, 93, 4, ${0.3 + p * 0.3})`;
+    ctx.lineWidth = 3;
+    ctx.strokeRect(x, y, s, s);
+
+    // Hard shadow - neobrutalist
+    ctx.fillStyle = `rgba(0, 0, 0, ${0.15 + p * 0.1})`;
+    ctx.fillRect(x + 4, y + 4, s, s);
+  }
+
+  function drawDiamond(p) {
+    const w = window.innerWidth, h = window.innerHeight;
+    const maxS = Math.min(w, h) * 0.35;
+    const minS = maxS * 0.15;
+    const s = minS + (maxS - minS) * p;
+
+    ctx.clearRect(0, 0, w, h);
+
+    const cx = w / 2, cy = h / 2;
+    ctx.save();
+    ctx.translate(cx, cy);
+    ctx.rotate(Math.PI / 4);
+
+    ctx.fillStyle = phase === 'inhale'
+      ? `rgba(232, 93, 4, ${0.15 + p * 0.2})`
+      : `rgba(255, 214, 10, ${0.1 + (1 - p) * 0.15})`;
+    ctx.fillRect(-s / 2, -s / 2, s, s);
+
+    ctx.strokeStyle = `rgba(255, 214, 10, ${0.25 + p * 0.35})`;
+    ctx.lineWidth = 2;
+    ctx.strokeRect(-s / 2, -s / 2, s, s);
+
+    ctx.restore();
+  }
+
+  function drawRings(p) {
+    const w = window.innerWidth, h = window.innerHeight;
+    const maxR = Math.min(w, h) * 0.4;
+    const rings = 5;
+
+    ctx.clearRect(0, 0, w, h);
+
+    for (let i = 0; i < rings; i++) {
+      const rp = (i + 1) / rings;
+      const baseR = maxR * rp * 0.3;
+      const expandR = maxR * rp * p * 0.7;
+      const r = baseR + expandR;
+
+      ctx.beginPath();
+      ctx.arc(w / 2, h / 2, r, 0, Math.PI * 2);
+      const alpha = (0.1 + (1 - rp) * 0.2) * (phase === 'inhale' ? p : 1 - p * 0.5);
+      ctx.strokeStyle = i % 2 === 0
+        ? `rgba(232, 93, 4, ${alpha})`
+        : `rgba(255, 214, 10, ${alpha})`;
+      ctx.lineWidth = 2;
+      ctx.stroke();
+    }
+  }
+
+  // ---- Cool-toned Drawings ----
+
+  function drawDiagonal(p) {
+    const w = window.innerWidth, h = window.innerHeight;
+    const diag = Math.sqrt(w * w + h * h);
+
+    ctx.clearRect(0, 0, w, h);
+    ctx.save();
+    ctx.translate(w / 2, h / 2);
+    ctx.rotate(-Math.PI / 4); // 45 degrees
+
+    // Full-screen rect that sweeps from bottom-left to top-right
+    const fullH = diag * 1.2;
+    const fullW = diag * 1.2;
+    const fillH = fullH * (0.05 + p * 0.9);
+
+    const grad = ctx.createLinearGradient(0, fullH / 2 - fillH, 0, fullH / 2);
+    grad.addColorStop(0, `rgba(58, 134, 255, ${0.02})`);
+    grad.addColorStop(0.5, `rgba(100, 180, 255, ${0.15 + p * 0.15})`);
+    grad.addColorStop(1, `rgba(58, 134, 255, ${0.25 + p * 0.15})`);
+
+    ctx.fillStyle = grad;
+    ctx.fillRect(-fullW / 2, fullH / 2 - fillH, fullW, fillH);
+
+    // Edge line
+    ctx.strokeStyle = `rgba(140, 210, 255, ${0.3 + p * 0.4})`;
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    ctx.moveTo(-fullW / 2, fullH / 2 - fillH);
+    ctx.lineTo(fullW / 2, fullH / 2 - fillH);
+    ctx.stroke();
+
+    ctx.restore();
+  }
+
+  function drawOceanSweep(p) {
+    const w = window.innerWidth, h = window.innerHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    const t = Date.now() * 0.001;
+    const layers = 7;
+
+    // Each layer has its own staggered timing, spacing, and amplitude
+    const layerSeeds = [0, 1.7, 0.4, 2.3, 1.1, 3.0, 0.8];
+    const layerSpacing = [0.05, 0.12, 0.08, 0.18, 0.1, 0.22, 0.15]; // varied gaps
+    const layerDelay = [0, 0.3, 0.1, 0.5, 0.2, 0.7, 0.4]; // staggered rise timing
+
+    // Compute cumulative Y positions with varied spacing
+    let cumY = 0;
+    const layerBasePositions = [];
+    for (let i = 0; i < layers; i++) {
+      cumY += layerSpacing[i];
+      layerBasePositions.push(cumY);
+    }
+    const totalSpan = cumY;
+
+    for (let i = 0; i < layers; i++) {
+      const normPos = layerBasePositions[i] / totalSpan;
+      const restY = h * (1 - normPos * 0.15); // layers cluster near bottom at rest
+
+      // Staggered rise: each layer delays slightly, then rises at its own pace
+      // Use eased progress with per-layer delay to prevent snapping
+      const delay = layerDelay[i];
+      const layerP = Math.max(0, Math.min(1, (p - delay * 0.3) / (1 - delay * 0.3)));
+      // Ease: slow start, organic feel
+      const eased = layerP < 0.1
+        ? layerP * layerP * 50  // stick at bottom
+        : 0.5 + 0.5 * Math.pow((layerP - 0.1) / 0.9, 0.7); // then rise smoothly
+
+      const riseAmount = normPos * 0.65 * eased;
+      const y = restY - h * riseAmount;
+
+      ctx.beginPath();
+      ctx.moveTo(-10, y);
+
+      // High-variation chaotic waves
+      const seed = layerSeeds[i];
+      const amp1 = 15 + i * 7 + Math.sin(t * 0.25 + seed) * 8;
+      const amp2 = 8 + i * 4 + Math.sin(t * 0.6 + seed * 2) * 5;
+      const amp3 = 4 + Math.sin(t * 0.9 + seed * 3) * 4;
+      const amp4 = 2 + Math.sin(t * 1.3 + seed) * 2;
+      const freq1 = 0.002 + Math.sin(t * 0.15 + seed) * 0.001;
+      const freq2 = 0.007 + i * 0.002;
+      const freq3 = 0.018 + Math.sin(t * 0.4 + seed) * 0.005;
+      const freq4 = 0.035 + i * 0.003;
+      const ph1 = t * (0.3 + seed * 0.12);
+      const ph2 = t * (0.6 + seed * 0.08) + seed * 2.1;
+      const ph3 = t * (1.0 + seed * 0.06) + seed * 0.7;
+      const ph4 = t * (1.5 + seed * 0.1) + seed * 1.3;
+
+      for (let x = -10; x <= w + 10; x += 3) {
+        const wave = Math.sin(x * freq1 + ph1) * amp1
+                   + Math.sin(x * freq2 + ph2) * amp2
+                   + Math.sin(x * freq3 + ph3) * amp3
+                   + Math.sin(x * freq4 + ph4) * amp4;
+        ctx.lineTo(x, y + wave);
+      }
+
+      ctx.lineTo(w + 10, h + 10);
+      ctx.lineTo(-10, h + 10);
+      ctx.closePath();
+
+      const alpha = (0.04 + normPos * 0.08) * (0.3 + eased * 0.7);
+      const colors = [
+        `rgba(10, 40, 120, ${alpha})`,
+        `rgba(20, 70, 160, ${alpha * 0.95})`,
+        `rgba(40, 100, 190, ${alpha * 0.85})`,
+        `rgba(15, 55, 145, ${alpha * 0.9})`,
+        `rgba(35, 85, 175, ${alpha * 0.8})`,
+        `rgba(55, 120, 200, ${alpha * 0.75})`,
+        `rgba(25, 65, 155, ${alpha * 0.85})`,
+      ];
+      ctx.fillStyle = colors[i];
+      ctx.fill();
+    }
+
+    // Shimmer lines -- varied distances, wilder movement
+    const shimmerCount = 4;
+    const shimmerGaps = [0.06, 0.14, 0.09, 0.2];
+    let shimmerCumY = 0;
+    for (let s = 0; s < shimmerCount; s++) {
+      shimmerCumY += shimmerGaps[s];
+      const shimmerDelay = s * 0.15;
+      const sP = Math.max(0, Math.min(1, (p - shimmerDelay * 0.2) / (1 - shimmerDelay * 0.2)));
+      const sEased = sP < 0.1 ? sP * sP * 50 : 0.5 + 0.5 * Math.pow((sP - 0.1) / 0.9, 0.7);
+
+      const shimmerY = h * (0.92 - shimmerCumY * 0.8 * sEased);
+      const shimmerAlpha = (0.15 + sEased * 0.35) * (1 - s * 0.2);
+      ctx.strokeStyle = `rgba(140, 210, 255, ${shimmerAlpha})`;
+      ctx.lineWidth = 3.5 - s * 0.6;
+      ctx.beginPath();
+
+      const sFreq1 = 0.004 + s * 0.003;
+      const sFreq2 = 0.011 + s * 0.006;
+      const sFreq3 = 0.022 + s * 0.005;
+      const sFreq4 = 0.04 + s * 0.003;
+      const sPhase = t * (0.6 + s * 0.35);
+
+      for (let x = 0; x <= w; x += 2) {
+        const wave = Math.sin(x * sFreq1 + sPhase) * (12 + s * 5)
+                   + Math.sin(x * sFreq2 + sPhase * 1.4) * (6 + s * 3)
+                   + Math.sin(x * sFreq3 + sPhase * 0.8 + s) * (4 + s * 2)
+                   + Math.sin(x * sFreq4 + sPhase * 1.7) * (2 + s);
+        if (x === 0) ctx.moveTo(x, shimmerY + wave);
+        else ctx.lineTo(x, shimmerY + wave);
+      }
+      ctx.stroke();
+    }
+
+    // Scattered foam
+    const seed = Math.floor(t * 1.5);
+    for (let d = 0; d < 18; d++) {
+      const dx = ((seed * 127 + d * 311 + d * d * 73) % w);
+      const topWaveY = h * (0.92 - 0.49 * p);
+      const dy = topWaveY + Math.sin(t * 1.8 + d * 1.7) * 20 - d * 5;
+      const da = Math.max(0, 0.06 * p * (1 - (d / 18)));
+      if (da > 0.01) {
+        const size = 1 + (d % 3);
+        ctx.fillStyle = `rgba(180, 220, 255, ${da})`;
+        ctx.fillRect(dx, dy, size, size);
+      }
+    }
+  }
+
+  function drawFrostField(p) {
+    const w = window.innerWidth, h = window.innerHeight;
+    ctx.clearRect(0, 0, w, h);
+
+    // Hexagonal grid that fades in/out
+    const hexR = 40;
+    const rowH = hexR * Math.sqrt(3);
+    const cols = Math.ceil(w / (hexR * 1.5)) + 2;
+    const rows = Math.ceil(h / rowH) + 2;
+
+    const centerX = w / 2, centerY = h / 2;
+    const maxDist = Math.sqrt(centerX * centerX + centerY * centerY);
+
+    for (let row = -1; row < rows; row++) {
+      for (let col = -1; col < cols; col++) {
+        const x = col * hexR * 1.5;
+        const y = row * rowH + (col % 2 ? rowH / 2 : 0);
+
+        const dist = Math.sqrt((x - centerX) ** 2 + (y - centerY) ** 2);
+        const normDist = dist / maxDist;
+
+        // Expand from center based on progress
+        const threshold = p * 1.3;
+        if (normDist > threshold) continue;
+
+        const fadeIn = Math.max(0, 1 - (normDist / threshold));
+        const alpha = fadeIn * (0.08 + p * 0.12);
+
+        ctx.beginPath();
+        for (let i = 0; i < 6; i++) {
+          const angle = (Math.PI / 3) * i - Math.PI / 6;
+          const hx = x + hexR * 0.7 * Math.cos(angle);
+          const hy = y + hexR * 0.7 * Math.sin(angle);
+          if (i === 0) ctx.moveTo(hx, hy);
+          else ctx.lineTo(hx, hy);
+        }
+        ctx.closePath();
+
+        ctx.strokeStyle = `rgba(100, 180, 240, ${alpha})`;
+        ctx.lineWidth = 1;
+        ctx.stroke();
+      }
+    }
+  }
+
+  // ---- Animation Loop ----
+  let animFrame = null;
+
+  function animate() {
+    if (!running) return;
+
+    const mode = MODES[modeIndex];
+    if (mode.type === 'canvas') {
+      const now = Date.now();
+      const elapsed = now - phaseStart;
+      const dur = phase === 'inhale' ? INHALE_MS : EXHALE_MS;
+      progress = Math.min(elapsed / dur, 1);
+
+      // Ease
+      const eased = phase === 'inhale'
+        ? 1 - Math.pow(1 - progress, 3)  // ease out
+        : Math.pow(progress, 2);          // ease in
+
+      const p = phase === 'inhale' ? eased : 1 - eased;
+
+      resizeCanvas();
+      mode.draw(p);
+    }
+
+    animFrame = requestAnimationFrame(animate);
+  }
+
+  // ---- Audio with Reverb ----
+  let audioCtx = null;
+  let convolver = null;
+  let reverbGain = null;
+  let dryGain = null;
+
+  function initAudio() {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+
+    // Create impulse response for reverb
+    const sampleRate = audioCtx.sampleRate;
+    const length = sampleRate * 1.5; // 1.5s reverb tail
+    const impulse = audioCtx.createBuffer(2, length, sampleRate);
+
+    for (let ch = 0; ch < 2; ch++) {
+      const data = impulse.getChannelData(ch);
+      for (let i = 0; i < length; i++) {
+        // Exponential decay with slight randomness
+        data[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / length, 2.5);
+      }
+    }
+
+    convolver = audioCtx.createConvolver();
+    convolver.buffer = impulse;
+
+    reverbGain = audioCtx.createGain();
+    reverbGain.gain.value = 0.35;
+
+    dryGain = audioCtx.createGain();
+    dryGain.gain.value = 0.7;
+
+    convolver.connect(reverbGain);
+    reverbGain.connect(audioCtx.destination);
+    dryGain.connect(audioCtx.destination);
+  }
+
+  function playTone(freq, duration, volume = 0.06, type = 'triangle') {
+    if (!audioCtx) return;
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.type = type;
+    osc.frequency.setValueAtTime(freq, audioCtx.currentTime);
+
+    gain.gain.setValueAtTime(0, audioCtx.currentTime);
+    gain.gain.linearRampToValueAtTime(volume, audioCtx.currentTime + 0.015);
+    gain.gain.exponentialRampToValueAtTime(0.001, audioCtx.currentTime + duration);
+
+    osc.connect(gain);
+    gain.connect(dryGain);     // dry
+    gain.connect(convolver);   // wet (reverb)
+
+    osc.start(audioCtx.currentTime);
+    osc.stop(audioCtx.currentTime + duration + 0.1);
+  }
+
+  function playInhaleBeat(b) {
+    const freq = 220 + (b - 1) * 44;
+    playTone(freq, 0.18, 0.05, 'triangle');
+  }
+
+  function playExhaleBeat(b) {
+    const freq = 415 - (b - 1) * 33;
+    playTone(freq, 0.22, 0.035, 'sine');
+  }
+
+  function playTransition(isInhale) {
+    const base = isInhale ? 330 : 262;
+    playTone(base, 0.4, 0.03, 'triangle');
+    setTimeout(() => playTone(base * 1.25, 0.35, 0.02, 'sine'), 60);
+  }
+
+  // ---- Core Logic ----
+
+  function flashDot() {
+    pulseDot.classList.add('on');
+    setTimeout(() => pulseDot.classList.remove('on'), 200);
+  }
+
+  function flashBeat() {
+    beatNum.classList.add('flash');
+    setTimeout(() => beatNum.classList.remove('flash'), 200);
+  }
+
+  function startBeatCounter(totalBeats, onBeat) {
+    currentBeat = 0;
+    clearInterval(beatInterval);
+    currentBeat = 1;
+    onBeat(currentBeat, totalBeats);
+
+    beatInterval = setInterval(() => {
+      currentBeat++;
+      if (currentBeat <= totalBeats) {
+        onBeat(currentBeat, totalBeats);
+      } else {
+        clearInterval(beatInterval);
+      }
+    }, BEAT_MS);
+  }
+
+  function inhale() {
+    if (!running) return;
+    phase = 'inhale';
+    phaseStart = Date.now();
+
+    label.textContent = 'in';
+    label.style.opacity = '1';
+
+    const mode = MODES[modeIndex];
+    if (mode.type === 'fill') {
+      fill.style.setProperty('--duration', INHALE_MS + 'ms');
+      fill.style.height = '82%';
+    }
+
+    playTransition(true);
+
+    startBeatCounter(INHALE_BEATS, (b) => {
+      beatNum.textContent = b;
+      flashDot();
+      flashBeat();
+      playInhaleBeat(b);
+    });
+
+    setTimeout(() => { if (running) exhale(); }, INHALE_MS);
+  }
+
+  function exhale() {
+    if (!running) return;
+    phase = 'exhale';
+    phaseStart = Date.now();
+
+    label.textContent = 'out';
+
+    const mode = MODES[modeIndex];
+    if (mode.type === 'fill') {
+      fill.style.setProperty('--duration', EXHALE_MS + 'ms');
+      fill.style.height = '4%';
+    }
+
+    playTransition(false);
+
+    startBeatCounter(EXHALE_BEATS, (b) => {
+      beatNum.textContent = b;
+      flashDot();
+      flashBeat();
+      playExhaleBeat(b);
+    });
+
+    setTimeout(() => {
+      if (running) {
+        breathCount++;
+        counter.textContent = `${breathCount}`;
+        inhale();
+      }
+    }, EXHALE_MS);
+  }
+
+  function start() {
+    if (!audioCtx) initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+
+    startScreen.classList.add('hidden');
+    running = true;
+    breathCount = 0;
+    counter.textContent = '';
+    phase = 'idle';
+
+    setMode(modeIndex);
+    resizeCanvas();
+    animate();
+
+    setTimeout(inhale, 600);
+  }
+
+  function stop() {
+    running = false;
+    phase = 'idle';
+    clearInterval(beatInterval);
+    cancelAnimationFrame(animFrame);
+
+    fill.style.setProperty('--duration', '800ms');
+    fill.style.height = '0%';
+    label.textContent = '';
+    counter.textContent = '';
+    beatNum.textContent = '';
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+    startScreen.classList.remove('hidden');
+  }
+
+  // ---- Events ----
+  startScreen.addEventListener('click', start);
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (running) stop();
+    } else if ((e.key === ' ' || e.key === 'Enter') && !running) {
+      start();
+    } else if (e.key === 'ArrowRight') {
+      setMode(modeIndex + 1);
+      if (MODES[modeIndex].type === 'fill') applyFillStyle(MODES[modeIndex].style);
+    } else if (e.key === 'ArrowLeft') {
+      setMode(modeIndex - 1);
+      if (MODES[modeIndex].type === 'fill') applyFillStyle(MODES[modeIndex].style);
+    }
+  });
+
+  let lastTap = 0;
+  document.addEventListener('touchend', () => {
+    const now = Date.now();
+    if (now - lastTap < 300 && running) stop();
+    lastTap = now;
+  });
+
+  // Init
+  window.addEventListener('resize', resizeCanvas);
+  setMode(0);
+</script>
+
+</body>
+</html>
