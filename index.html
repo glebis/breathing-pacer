@@ -223,7 +223,6 @@
   // ---- Visual Modes ----
   const MODES = [
     { name: 'solid fill', type: 'fill', style: 'solid' },
-    { name: 'gradient fill', type: 'fill', style: 'gradient' },
     { name: 'expanding circle', type: 'canvas', draw: drawCircle },
     { name: 'breathing square', type: 'canvas', draw: drawSquare },
     { name: 'diamond', type: 'canvas', draw: drawDiamond },
@@ -269,10 +268,6 @@
       fill.style.background = `rgba(58, 134, 255, 0.25)`;
       fillLine.style.background = `rgba(120, 200, 255, 0.6)`;
       fillLine.style.filter = 'blur(8px)';
-    } else {
-      fill.style.background = `linear-gradient(180deg, rgba(232,93,4,0.1) 0%, rgba(232,93,4,0.3) 40%, rgba(255,214,10,0.25) 70%, rgba(255,214,10,0.45) 100%)`;
-      fillLine.style.background = `rgba(255, 214, 10, 0.5)`;
-      fillLine.style.filter = 'blur(10px)';
     }
   }
 
