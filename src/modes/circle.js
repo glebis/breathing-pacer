@@ -1,4 +1,4 @@
-export const meta = { name: 'expanding circle', cool: false };
+export const meta = { name: 'expanding circle', cool: false, order: 1 };
 
 export function draw(p, phase, ctx, w, h) {
   const maxR = Math.min(w, h) * 0.38;

@@ -1,4 +1,4 @@
-export const meta = { name: 'ocean sweep', cool: true };
+export const meta = { name: 'ocean sweep', cool: true, order: 6 };
 
 export function draw(p, phase, ctx, w, h) {
   ctx.clearRect(0, 0, w, h);

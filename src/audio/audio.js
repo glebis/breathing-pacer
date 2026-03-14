@@ -2,6 +2,8 @@ let audioCtx = null;
 let convolver = null;
 let reverbGain = null;
 let dryGain = null;
+let masterGain = null;
+let volume = 1.0;
 
 export function initAudio() {
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
@@ -26,9 +28,13 @@ export function initAudio() {
   dryGain = audioCtx.createGain();
   dryGain.gain.value = 0.7;
 
+  masterGain = audioCtx.createGain();
+  masterGain.gain.value = volume;
+  masterGain.connect(audioCtx.destination);
+
   convolver.connect(reverbGain);
-  reverbGain.connect(audioCtx.destination);
-  dryGain.connect(audioCtx.destination);
+  reverbGain.connect(masterGain);
+  dryGain.connect(masterGain);
 }
 
 export function ensureAudio() {
@@ -67,4 +73,24 @@ export function playTransition(isInhale) {
   const base = isInhale ? 330 : 262;
   playTone(base, 0.4, 0.03, 'triangle');
   setTimeout(() => playTone(base * 1.25, 0.35, 0.02, 'sine'), 60);
+}
+
+export function setVolume(v) {
+  volume = Math.max(0, Math.min(1, v));
+  if (masterGain) masterGain.gain.value = volume;
+  return volume;
+}
+
+export function getVolume() {
+  return volume;
+}
+
+export function toggleMute() {
+  if (volume > 0) {
+    volume = 0;
+  } else {
+    volume = 1.0;
+  }
+  if (masterGain) masterGain.gain.value = volume;
+  return volume;
 }

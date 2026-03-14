@@ -1,4 +1,4 @@
-export const meta = { name: 'concentric rings', cool: false };
+export const meta = { name: 'concentric rings', cool: false, order: 4 };
 
 export function draw(p, phase, ctx, w, h) {
   const maxR = Math.min(w, h) * 0.4;

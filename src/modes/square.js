@@ -1,4 +1,4 @@
-export const meta = { name: 'breathing square', cool: false };
+export const meta = { name: 'breathing square', cool: false, order: 2 };
 
 export function draw(p, phase, ctx, w, h) {
   const maxS = Math.min(w, h) * 0.55;

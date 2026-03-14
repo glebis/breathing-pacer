@@ -1,4 +1,4 @@
-export const meta = { name: 'cool diagonal', cool: true };
+export const meta = { name: 'cool diagonal', cool: true, order: 5 };
 
 export function draw(p, phase, ctx, w, h) {
   const diag = Math.sqrt(w * w + h * h);

@@ -1,4 +1,4 @@
-export const meta = { name: 'diamond', cool: false };
+export const meta = { name: 'diamond', cool: false, order: 3 };
 
 export function draw(p, phase, ctx, w, h) {
   const maxS = Math.min(w, h) * 0.35;

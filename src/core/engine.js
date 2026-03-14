@@ -1,6 +1,7 @@
 import { INHALE_BEATS, EXHALE_BEATS, BEAT_MS, INHALE_MS, EXHALE_MS } from './config.js';
 import { MODES } from '../modes/index.js';
 import { ensureAudio, playInhaleBeat, playExhaleBeat, playTransition } from '../audio/audio.js';
+import { startTimer, stopTimer, setImmersiveColors } from './timer.js';
 
 // ---- DOM ----
 const fill = document.getElementById('fill');
@@ -18,6 +19,7 @@ const ctx = canvas.getContext('2d');
 let running = false;
 let breathCount = 0;
 let currentBeat = 0;
+let immersive = false;
 let beatInterval = null;
 let phase = 'idle';
 let phaseStart = 0;
@@ -38,15 +40,23 @@ function isCoolMode() {
   return MODES[modeIndex].cool;
 }
 
+function modeSlug(name) {
+  return name.replace(/\s+/g, '-').toLowerCase();
+}
+
 function setMode(i) {
   modeIndex = ((i % MODES.length) + MODES.length) % MODES.length;
   const mode = MODES[modeIndex];
   modeIndicator.textContent = mode.name;
 
+  // Update URL hash without triggering hashchange
+  history.replaceState(null, '', '#' + modeSlug(mode.name));
+
   const cool = isCoolMode();
   document.body.style.background = cool ? '#050a1a' : '#1a0a00';
   label.style.color = cool ? 'rgba(120, 200, 255, 0.5)' : 'rgba(255, 214, 10, 0.5)';
   beatNum.style.color = cool ? 'rgba(100, 180, 240, 0.25)' : 'rgba(255, 214, 10, 0.25)';
+  setImmersiveColors(cool);
 
   if (mode.type === 'fill') {
     fill.style.display = 'block';
@@ -167,7 +177,7 @@ function exhale() {
 }
 
 // ---- Public API ----
-export function start() {
+export function start(presetKey) {
   ensureAudio();
 
   startScreen.classList.add('hidden');
@@ -180,6 +190,10 @@ export function start() {
   resizeCanvas();
   animate();
 
+  if (presetKey) {
+    startTimer(presetKey, () => stop());
+  }
+
   setTimeout(inhale, 600);
 }
 
@@ -188,6 +202,7 @@ export function stop() {
   phase = 'idle';
   clearInterval(beatInterval);
   cancelAnimationFrame(animFrame);
+  stopTimer();
 
   fill.style.setProperty('--duration', '800ms');
   fill.style.height = '0%';
@@ -207,10 +222,37 @@ export function prevMode() {
   setMode(modeIndex - 1);
 }
 
+export function setModeByName(name) {
+  const slug = name.replace(/\s+/g, '-').toLowerCase();
+  const idx = MODES.findIndex(m => modeSlug(m.name) === slug);
+  if (idx >= 0) setMode(idx);
+}
+
+export function toggleImmersive() {
+  immersive = !immersive;
+  const uiElements = [label, counter, beatNum, modeIndicator, pulseDot];
+  uiElements.forEach(el => el.style.display = immersive ? 'none' : '');
+  return immersive;
+}
+
 export function isRunning() {
   return running;
 }
 
 // ---- Init ----
 window.addEventListener('resize', resizeCanvas);
-setMode(0);
+
+// Hash-based mode routing: #ocean-sweep, #torpedo-swarm, etc.
+const hash = location.hash.slice(1);
+if (hash) {
+  const idx = MODES.findIndex(m => modeSlug(m.name) === hash);
+  setMode(idx >= 0 ? idx : 0);
+} else {
+  setMode(0);
+}
+
+window.addEventListener('hashchange', () => {
+  const h = location.hash.slice(1);
+  const idx = MODES.findIndex(m => modeSlug(m.name) === h);
+  if (idx >= 0) setMode(idx);
+});

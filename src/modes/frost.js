@@ -1,4 +1,4 @@
-export const meta = { name: 'frost field', cool: true };
+export const meta = { name: 'frost field', cool: true, order: 7 };
 
 export function draw(p, phase, ctx, w, h) {
   ctx.clearRect(0, 0, w, h);
