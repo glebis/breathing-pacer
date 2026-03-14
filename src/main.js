@@ -1,5 +1,5 @@
 import { start, stop, nextMode, prevMode, isRunning, setModeByName, toggleImmersive } from './core/engine.js';
-import { setVolume, getVolume, toggleMute } from './audio/audio.js';
+import { setVolume, getVolume, toggleMute, cycleSoundMode, getSoundMode } from './audio/audio.js';
 import { getPresetList, adjustPreset } from './core/timer.js';
 
 // ---- Preset keyboard map: 1-6 to start with preset ----
@@ -26,6 +26,9 @@ document.addEventListener('keydown', (e) => {
     prevMode();
   } else if (e.key === '>' || (e.shiftKey && e.key === '.')) {
     toggleImmersive();
+  } else if (e.key === 's' || e.key === 'S') {
+    const mode = cycleSoundMode();
+    console.log('Sound:', mode);
   } else if (e.key === 'm' || e.key === 'M') {
     toggleMute();
   } else if (e.key === 'ArrowUp') {

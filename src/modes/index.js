@@ -12,6 +12,12 @@ import { meta as frostMeta, draw as frostDraw } from './frost.js';
 import { meta as particlesMeta, draw as particlesDraw } from './particles.js';
 import { meta as auroraMeta, draw as auroraDraw } from './aurora.js';
 import { meta as tendrilsMeta, draw as tendrilsDraw } from './tendrils.js';
+import { meta as lava_lampMeta, draw as lava_lampDraw } from './lava-lamp.js';
+import { meta as myceliumMeta, draw as myceliumDraw } from './mycelium.js';
+import { meta as ink_dropsMeta, draw as ink_dropsDraw } from './ink-drops.js';
+import { meta as coralMeta, draw as coralDraw } from './coral.js';
+import { meta as firefliesMeta, draw as firefliesDraw } from './fireflies.js';
+import { meta as ink_ripplesMeta, draw as ink_ripplesDraw } from './ink-ripples.js';
 
 export const MODES = [
   { ...solid_fillMeta, type: 'fill', applyStyle: solid_fillStyle },
@@ -25,4 +31,10 @@ export const MODES = [
   { ...particlesMeta, type: 'canvas', draw: particlesDraw },
   { ...auroraMeta, type: 'canvas', draw: auroraDraw },
   { ...tendrilsMeta, type: 'canvas', draw: tendrilsDraw },
+  { ...lava_lampMeta, type: 'canvas', draw: lava_lampDraw },
+  { ...myceliumMeta, type: 'canvas', draw: myceliumDraw },
+  { ...ink_dropsMeta, type: 'canvas', draw: ink_dropsDraw },
+  { ...coralMeta, type: 'canvas', draw: coralDraw },
+  { ...firefliesMeta, type: 'canvas', draw: firefliesDraw },
+  { ...ink_ripplesMeta, type: 'canvas', draw: ink_ripplesDraw },
 ];
