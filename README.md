@@ -2,63 +2,64 @@
 
 A fullscreen, hypnotic breathing visualization tool designed for coherent breathing at 5.5 breaths/minute (5 beats inhale, 6 beats exhale at 60 BPM).
 
+![Aurora mode during inhale](screenshot-aurora.png)
+
 ## Why
 
-Built as a personal tool for managing Generalized Anxiety Disorder (GAD). Designed to be visually engaging enough for an ADHD-adjacent attention profile while activating parasympathetic tone through rhythmic breathing. See the Obsidian vault note `Coherent Breathing Protocol.md` for the clinical rationale and genomic context.
+Built as a personal tool for managing Generalized Anxiety Disorder (GAD). Designed to be visually engaging enough for an ADHD-adjacent attention profile while activating parasympathetic tone through rhythmic breathing.
 
 ## Features
 
-- Multiple visual modes switchable with arrow keys
-- 8-bit audio with reverb (Web Audio API)
-- Beat counting synchronized to 60 BPM
-- Fullscreen, distraction-free
+- 17 visual modes (arrow keys to switch, hash URLs for direct access)
+- 5 sound modes: 8-bit, sonar, warm pad, heartbeat, silent (S to cycle)
+- Context-based timer presets (1-6 keys): morning, pre-work, content-urge, evening, minimum dose, custom
+- Immersive mode (Shift+.) hides all UI
+- Volume control (Up/Down arrows, M to mute)
 - No dependencies — monolithic (`index.html`) and modular (`modular.html` + `src/`) versions
 
 ## Visual Modes
 
-### Current
-- Solid fill (warm)
-- Expanding circle
-- Breathing square (neobrutalist)
-- Diamond
-- Concentric rings
-- Cool diagonal (blue)
-- Ocean sweep (organic waves - the favorite)
-- Frost field (hexagonal)
-- Cool solid fill (blue)
+Solid fill, circle, breathing square (neobrutalist), diamond, concentric rings, diagonal sweep, ocean waves, frost hexagons, particles, aurora, tendrils, lava lamp, mycelium network, ink drops, coral reef, fireflies, ink ripples.
 
-### Planned
-- Asymmetric organic shapes (torpedo/leaf forms)
-- Particle systems
-- Generative art modes with less geometric symmetry
-- More hypnotic, less structured visualizations
+Warm modes use orange/amber palette. Cool modes (`cool: true`) switch to blue/cyan.
+
+## Controls
+
+| Key | Action |
+|-----|--------|
+| Space / Enter / Click | Start |
+| Escape / Double-tap | Stop |
+| Left / Right | Switch mode |
+| Shift + . | Toggle immersive (hide all UI) |
+| S | Cycle sound mode |
+| M | Mute / unmute |
+| Up / Down | Volume |
+| 1-6 | Start with timer preset |
+
+Direct mode access via URL hash: `modular.html#aurora`, `modular.html#ocean`, etc.
+
+Timer presets also available via URL param: `?preset=morning`
 
 ## Architecture
 
 ```
 breathing-pacer/
-├── index.html          # Monolithic version (self-contained, always works)
-├── modular.html        # ES module version (loads from src/)
+├── index.html              # Monolithic version (self-contained)
+├── modular.html            # ES module version
 ├── src/
-│   ├── main.js         # Event bindings, entry point
+│   ├── main.js             # Event bindings, entry point
 │   ├── core/
-│   │   ├── config.js   # Timing constants, colors
-│   │   ├── state.js    # Shared state object
-│   │   └── engine.js   # Animation loop, phase logic, mode switching
+│   │   ├── config.js       # Timing constants, colors
+│   │   ├── state.js        # Shared state object
+│   │   └── engine.js       # Animation loop, phase logic, mode switching
 │   ├── modes/
-│   │   ├── index.js    # Mode registry (import all, export MODES array)
-│   │   ├── ocean.js    # Ocean sweep (organic waves)
-│   │   ├── frost.js    # Frost field (hexagonal)
-│   │   ├── diagonal.js # Cool diagonal (blue 45°)
-│   │   ├── circle.js   # Expanding circle
-│   │   ├── square.js   # Breathing square (neobrutalist)
-│   │   ├── diamond.js  # Diamond
-│   │   ├── rings.js    # Concentric rings
-│   │   ├── solid-fill.js
-│   │   └── cool-solid-fill.js
+│   │   ├── index.js        # Auto-generated registry (build-modes.js)
+│   │   └── *.js            # One file per visual mode
 │   └── audio/
-│       └── audio.js    # Web Audio API, reverb, tone generators
-└── README.md
+│       └── audio.js        # Web Audio API, 5 sound modes, reverb
+├── scripts/
+│   └── build-modes.js      # Scans modes/, generates index.js
+└── package.json
 ```
 
 ### Adding a new mode
@@ -66,7 +67,7 @@ breathing-pacer/
 Create a file in `src/modes/` that exports:
 
 ```js
-export const meta = { name: 'my mode', cool: false };  // cool: true = blue palette
+export const meta = { name: 'my mode', cool: false, order: 30 };
 
 export function draw(p, phase, ctx, w, h) {
   // p: 0-1 eased progress (0=contracted, 1=expanded)
@@ -78,23 +79,16 @@ export function draw(p, phase, ctx, w, h) {
 }
 ```
 
-Then register it in `src/modes/index.js`. Modes can be developed independently by different agents or in parallel.
+Then run `node scripts/build-modes.js` to regenerate the registry. Modes are sorted by `order` field.
 
 ## Usage
 
-Open `index.html` (monolithic) or `modular.html` (ES modules, needs local server) in a browser. Tap/click/press Enter to start. Arrow keys to switch modes. Escape to stop.
-
-For the modular version, serve locally (ES modules require HTTP):
 ```bash
-npx serve .   # or python3 -m http.server
+npm run serve          # python3 -m http.server 8765
+open http://localhost:8765/modular.html
 ```
 
-## Design
-
-- Agency brand: `#e85d04` (orange), `#ffd60a` (yellow), `#3a86ff` (blue)
-- Cool palette: navy background, blue/cyan tones
-- Neobrutalism elements (hard shadows, bold type) from Geist font family
-- Audio: Web Audio API with synthetic reverb (convolver)
+Or open `index.html` directly for the monolithic version.
 
 ## Breathing Protocol
 
@@ -102,3 +96,14 @@ npx serve .   # or python3 -m http.server
 - **Exhale**: 6 seconds (6 beats at 60 BPM)
 - **Rate**: ~5.5 breaths/minute (resonance frequency)
 - **Minimum dose**: 3 breaths (33 seconds)
+
+## Timer Presets
+
+| # | Preset | Duration | Use case |
+|---|--------|----------|----------|
+| 1 | Morning | 3 min | Cortisol awakening response |
+| 2 | Pre-work | 5 min | Executive function warm-up |
+| 3 | Content urge | 1 min | Dopamine craving redirect |
+| 4 | Evening | 5 min | Parasympathetic wind-down |
+| 5 | Minimum dose | 33 sec | 3 breaths, any time |
+| 6 | Custom | 2 min | Adjustable, saved to localStorage |
